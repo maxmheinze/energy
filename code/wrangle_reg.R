@@ -3,10 +3,12 @@
 
 pacman::p_load(
   tidyverse,
-  lubridate
+  lubridate, 
+  plm, 
+  sandwich
 )
 
-
+#ADJUST DIRECTORY
 gen_energy <- read_csv("monthly_full_release_long_format-4.csv")
 
 gen_energy_europe <- gen_energy %>% 
@@ -39,12 +41,13 @@ gen_energy_panel <- left_join(price_energy_europe_demand, price_energy_europe_sh
 #setting irish nuclear generating capacity to zero
 gen_energy_panel[is.na(gen_energy_panel)] <- 0
 
-#write.csv(gen_energy_panel, "gen_energy_demand_share.csv")
 
 
 
 
 # loading in price data ---------------------------------------------------
+
+#ADJUST DIRECTORY
 price_data <- read_csv("price_data.csv")
 
 #calculate mean
@@ -64,6 +67,8 @@ price_data_mean_sd <- price_data_mean %>%
 
 
 # loading in heating degree days ------------------------------------------
+
+#ADJUST DIRECTORY
 hdd_cdd <- read_csv("hdd_cdd.csv")
 
 temp_hdd <- hdd_cdd %>%
@@ -80,13 +85,58 @@ temp_hdd <- temp_hdd %>%
   rename("Country" = "geo") 
 
 
+
+# Loading in oil price data -----------------------------------------------
+
+#ADJUST DIRECTORY
+oil_prices <- read_csv("oil_prices.csv")
+
+oil <- oil_prices %>%
+  select(geo, TIME_PERIOD, indic_nrg, OBS_VALUE) %>%
+  mutate(TIME_PERIOD = ym(TIME_PERIOD)) %>%
+  mutate(year = year(TIME_PERIOD)) %>%
+  mutate(month = month(TIME_PERIOD)) %>%
+  select(geo, year, month, OBS_VALUE) %>%
+  rename("Country" = "geo") %>%
+  rename("oil" = "OBS_VALUE")
+  
+
 # merging stuff -----------------------------------------------------------
 final_panel_1 <- left_join(price_data_mean_sd, gen_energy_panel)
 
-final_panel <- left_join(final_panel_1, temp_hdd)
+final_panel_2 <- left_join(final_panel_1, oil)
 
-summary(lm(log(mean_price) ~ as.factor(Date) + as.factor(`Country code`) + share_nuclear + demand + temp, final_panel))
+final_panel <- left_join(final_panel_2, temp_hdd)
 
-summary(lm((log(sd_price^2)) ~ as.factor(Date) + as.factor(`Country code`) + share_nuclear + demand + temp, final_panel))
 
+# imputation of oil price data  -------------------------------------------
+final_panel_imputed <- final_panel %>% 
+  group_by(Date) %>%
+  mutate(oil_imputed = ifelse(is.na(oil), mean(oil, na.rm = TRUE), oil))
+
+
+
+
+
+
+
+# regressing stuff --------------------------------------------------------
+
+summary(lm(log(mean_price) ~ as.factor(Date) + as.factor(`Country code`) + share_nuclear + demand + temp + oil, final_panel_imputed))
+
+summary(lm((log(sd_price^2)) ~ as.factor(Date) + as.factor(`Country code`) + share_nuclear + demand + temp + oil, final_panel_imputed))
+
+summary(lm(log(sd_price^2) ~ as.factor(Date) + as.factor(`Country code`) + share_nuclear + log(demand) + temp + oil, final_panel_imputed))
+
+plm <- plm(log(mean_price) ~ share_nuclear + demand + temp + oil, 
+           index = c("Country", "Date"),
+           model = "within", 
+           effect = "twoways",
+           data = final_panel_imputed)
+
+plm_sd <- plm(log(sd_price) ~ share_nuclear + demand + temp + oil, 
+           index = c("Country", "Date"),
+           model = "within", 
+           effect = "twoways",
+           data = final_panel_imputed)
 
