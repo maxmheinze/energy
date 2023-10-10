@@ -38,6 +38,15 @@ price_energy_europe_demand <- price_energy_europe_1 %>%
   mutate(year = year(Date)) %>%
   mutate(month = month(Date))
 
+#saving electricity generation as a control variable
+price_energy_europe_generation <- price_energy_europe_1 %>% 
+  filter(Category %in% "Electricity generation") %>%
+  filter(Subcategory %in% "Total") %>%
+  select("Country", "Country code", "Date", "Value") %>%
+  rename(generation = Value) %>% 
+  mutate(year = year(Date)) %>%
+  mutate(month = month(Date))
+
 #Renewables 
 price_energy_europe_renewables <- price_energy_europe_1 %>% 
   filter(Category %in% "Electricity generation") %>%
@@ -48,9 +57,12 @@ price_energy_europe_renewables <- price_energy_europe_1 %>%
   mutate(year = year(Date)) %>%
   mutate(month = month(Date))
 
+
 gen_energy_panel_1 <- left_join(price_energy_europe_demand, price_energy_europe_share_nuclear, by = c("Country", "Country code", "Date"))
 
-gen_energy_panel <- left_join(gen_energy_panel_1, price_energy_europe_renewables, by = c("Country", "Country code", "Date", "year", "month"))
+gen_energy_panel_2 <- left_join(price_energy_europe_generation, gen_energy_panel_1, by = c("Country", "Country code", "Date", "year", "month"))
+
+gen_energy_panel <- left_join(gen_energy_panel_2, price_energy_europe_renewables, by = c("Country", "Country code", "Date", "year", "month"))
 
 #setting irish nuclear generating capacity to zero
 gen_energy_panel[is.na(gen_energy_panel)] <- 0
@@ -100,6 +112,20 @@ temp_hdd <- temp_hdd %>%
 
 
 
+
+
+
+# Loading in natural gas price data ---------------------------------------
+nat_gas <- read_csv("nat_gas_prices.csv")
+
+nat_gas_1 <- nat_gas %>%
+  rename("Country" = "country_clean") %>%
+  select(year, month, Country, gas_ppi)
+
+
+
+
+
 # Loading in oil price data -----------------------------------------------
 
 #ADJUST DIRECTORY
@@ -120,7 +146,9 @@ final_panel_1 <- left_join(price_data_mean_sd, gen_energy_panel)
 
 final_panel_2 <- left_join(final_panel_1, oil)
 
-final_panel <- left_join(final_panel_2, temp_hdd)
+final_panel_3 <- left_join(final_panel_2, nat_gas_1)
+
+final_panel <- left_join(final_panel_3, temp_hdd)
 
 
 # imputation of oil price data  -------------------------------------------
@@ -193,7 +221,7 @@ model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + log(demand) +
 
 #DIFFERENTIAL IMPACT WITH ENERGY DEMAND
 
-model_feols_mean <- feols((log(mean_price)) ~ share_nuclear + temp + (demand) + oil_imputed + I(demand*share_nuclear) | Country + Date,
+model_feols_mean <- feols((log(mean_price)) ~ share_nuclear + temp + (demand) + oil_imputed + I((demand)*share_nuclear) | Country + Date,
                           vcov = "cluster",
                           data = final_panel_imputed)
 
@@ -201,7 +229,7 @@ model_feols_mean <- feols(log(mean_price) ~ (share_nuclear) + temp + log(demand)
                           vcov = "cluster", 
                           data = final_panel_imputed)
 
-model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + (demand) + oil_imputed + I(demand*share_nuclear) | Country + Date,
+model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + (demand) + (oil_imputed) + I(demand*share_nuclear) | Country + Date,
                           vcov = "cluster",
                           data = final_panel_imputed)
 
@@ -249,6 +277,7 @@ model_feols_mean <- feols(log(mean_price) ~ (share_nuclear) +  share_renewables 
 model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + share_renewables + temp + log(demand) + log(oil_imputed) | Country + Date,
                         vcov = "cluster",
                         data = final_panel_imputed)
+
 
 
 
