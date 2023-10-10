@@ -38,7 +38,19 @@ price_energy_europe_demand <- price_energy_europe_1 %>%
   mutate(year = year(Date)) %>%
   mutate(month = month(Date))
 
-gen_energy_panel <- left_join(price_energy_europe_demand, price_energy_europe_share_nuclear, by = c("Country", "Country code", "Date"))
+#Renewables 
+price_energy_europe_renewables <- price_energy_europe_1 %>% 
+  filter(Category %in% "Electricity generation") %>%
+  filter(Variable == "Renewables") %>%
+  filter(Unit == "%") %>%
+  select("Country", "Country code", "Date", "Value") %>%
+  rename(share_renewables = Value) %>% 
+  mutate(year = year(Date)) %>%
+  mutate(month = month(Date))
+
+gen_energy_panel_1 <- left_join(price_energy_europe_demand, price_energy_europe_share_nuclear, by = c("Country", "Country code", "Date"))
+
+gen_energy_panel <- left_join(gen_energy_panel_1, price_energy_europe_renewables, by = c("Country", "Country code", "Date", "year", "month"))
 
 #setting irish nuclear generating capacity to zero
 gen_energy_panel[is.na(gen_energy_panel)] <- 0
@@ -117,13 +129,13 @@ final_panel_imputed <- final_panel %>%
   mutate(oil_imputed = ifelse(is.na(oil), mean(oil, na.rm = TRUE), oil))
 
 
-
-
 #PREPARING DATA FOR ENERGY CRISIS regression
 final_panel_imputed <- final_panel_imputed %>% group_by(Date, Country) %>%
   select(!oil) %>%
   mutate(energycrisis = ifelse(Date > as.Date("2021-09-01"), 1, 0)) %>%
   na.omit()
+
+
 
 
 #DATA TRANSFORMATION FINSIHED
@@ -138,7 +150,7 @@ final_panel_imputed <- final_panel_imputed %>% group_by(Date, Country) %>%
 #summary(lm((log(sd_price^2)) ~ as.factor(Date) + as.factor(`Country code`) + share_nuclear + demand + temp + oil_imputed, final_panel_imputed))
 
 
-model_feols_mean <- feols(log(mean_price) ~ (share_nuclear) + temp + log(demand) + log(oil_imputed) | Country + Date,
+model_feols_mean <- feols(log(mean_price) ~ (share_nuclear) + log(temp) + (demand) + log(oil_imputed) | Country + Date,
                           vcov = "cluster", 
                           data = final_panel_imputed)
 
@@ -162,6 +174,9 @@ plm_sd <- plm(log(sd_price^2) ~ lag(log(mean_price)) + share_nuclear + log(deman
            data = final_panel_imputed)
 
 
+#linear time trends
+plm <- lm(log(mean_price) ~  as.factor(Country) + as.numeric(Date) + as.factor(Country)*as.numeric(Date) + share_nuclear + log(demand) + temp + oil_imputed, 
+           data = final_panel_imputed)
 
 
 
@@ -212,6 +227,7 @@ quantile_model <- rq(log(sd_price^2) ~ as.factor(Country) + as.factor(Date) + sh
                      tau = quantile_level)
 
 
+summary(quantile_model, se = "boot")
 #for (tau in quantiles) {
 #  model <- rq(log(sd_price^2) ~ as.factor(Country) + as.factor(Date) + share_nuclear + log(demand) + temp + oil_imputed, 
 #              tau = tau, data = final_panel_imputed)
@@ -219,6 +235,20 @@ quantile_model <- rq(log(sd_price^2) ~ as.factor(Country) + as.factor(Date) + sh
 #                         adjust = TRUE)
 #  print(coeftest(model, vcov = clustered_se))
 #}
+
+
+
+
+
+#ADDING RENEWABLES
+
+model_feols_mean <- feols(log(mean_price) ~ (share_nuclear) +  share_renewables + temp + log(demand) + log(oil_imputed) | Country + Date,
+                          vcov = "cluster", 
+                          data = final_panel_imputed)
+
+model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + share_renewables + temp + log(demand) + log(oil_imputed) | Country + Date,
+                        vcov = "cluster",
+                        data = final_panel_imputed)
 
 
 
