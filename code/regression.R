@@ -385,13 +385,13 @@ model_feols_mean_diff <- feols((log(mean_price)) ~ share_nuclear + I(generation*
                                vcov = "cluster",
                                data = final_panel_imputed)
 
-model_feols_sd_diff <- feols((log(sd_price^2)) ~ share_nuclear  + temperature + I(temperature^2) + (demand) + log(gas_ppi) | Country + Date,
+model_feols_sd_diff <- feols((log(sd_price^2)) ~ share_nuclear + I(generation*share_nuclear)  + temperature + I(temperature^2) + (demand) + log(gas_ppi) | Country + Date,
                              vcov = "cluster",
                              data = final_panel_imputed)
 
 etable(model_feols_mean_diff, model_feols_sd_diff, 
          tex = TRUE, 
-         digits = 2,
+         digits = 4,
          dict = c("log(sd_price^2)" = "log(variance)",
                   "log(gas_ppi)" = "log(nat_gas)", 
                   "I(generation*share_nuclear)" = "nuclear_generation"))
