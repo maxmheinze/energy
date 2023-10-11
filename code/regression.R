@@ -199,7 +199,7 @@ final_panel_imputed <- final_panel_imputed_1 %>%
 
 #DATA TRANSFORMATION FINSIHED
 
-final_panel_imputed$nuclear_bin <- relevel(final_panel_imputed$nuclear_bin, ref = "low")
+final_panel_imputed$nuclear_bin <- relevel(final_panel_imputed$nuclear_bin, ref = "no")
 
 
 
@@ -210,25 +210,8 @@ final_panel_imputed$nuclear_bin <- relevel(final_panel_imputed$nuclear_bin, ref 
 #summary(lm((log(sd_price^2)) ~ as.factor(Date) + as.factor(`Country code`) + share_nuclear + demand + temp + oil_imputed, final_panel_imputed))
 
 
-model_feols_mean <- feols(log(mean_price) ~ share_nuclear + (temperature) + I(temperature^2)  + (demand) + log(gas_ppi) | Country + Date,
-                          vcov = "cluster", 
-                          data = final_panel_imputed)
 
 
-model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temperature + I(temperature^2) + (demand) + log(gas_ppi)  | Country + Date,
-                        vcov = "cluster",
-                        data = final_panel_imputed)
-
-
-
-#DIFFERENTIAL IMPACT DURING ENERGY CRISIS?
-model_feols_mean_diff <- feols((log(mean_price)) ~ share_nuclear +  I(temperature^2) + temperature  + (demand) + log(gas_ppi) + I(energycrisis*share_nuclear) | Country + Date,
-                          vcov = "cluster",
-                          data = final_panel_imputed)
-
-model_feols_sd_diff <- feols((log(sd_price^2)) ~ share_nuclear +temperature + I(temperature^2) + (demand) + log(gas_ppi) + I(energycrisis*share_nuclear) | Country + Date,
-                        vcov = "cluster",
-                        data = final_panel_imputed)
 
 
 
@@ -236,24 +219,6 @@ model_feols_sd_diff <- feols((log(sd_price^2)) ~ share_nuclear +temperature + I(
 
 #DIFFERENTIAL IMPACT WITH ENERGY DEMAND
 
-model_feols_mean_generation <- feols((log(mean_price)) ~ share_nuclear + temperature + I(temperature^2)  + (demand) + log(gas_ppi) + I((generation)*share_nuclear) | Country + Date,
-                          vcov = "cluster",
-                          data = final_panel_imputed)
-
-model_feols_sd_generation <- feols(log(sd_price^2) ~ (share_nuclear) + temperature + I(temperature^2) + (demand) + log(gas_ppi) + I(share_nuclear*(generation)) | Country + Date,
-                          vcov = "cluster", 
-                          data = final_panel_imputed)
-
-model_feols_sd_generation <- feols((log(sd_price^2)) ~ share_nuclear + temp + log(demand) + log(oil_imputed) + I(generation*share_nuclear) | Country + Date,
-                          vcov = "cluster",
-                          data = final_panel_imputed)
-
-
-model_feols_sd_generation <- feols((log(sd_price^2)) ~ share_nuclear + temperature + (demand) + oil_imputed + I((generation)*share_nuclear) | Country + Date,
-                        vcov = "cluster",
-                        data = final_panel_imputed)
-
-summary(quantile_model, se = "boot")
 
 
 
@@ -272,25 +237,25 @@ plm_sd <- plm(log(sd_price^2) ~ lag(log(mean_price)) + share_nuclear + log(deman
 
 
 #linear time trends
-plm <- lm(log(mean_price) ~  as.factor(Country) + as.numeric(Date) + as.factor(Country)*as.numeric(Date) + share_nuclear + log(demand) + temperature + oil_imputed, 
+plm <- lm(log(sd_price^2) ~  as.factor(Country) + as.numeric(Date) + as.factor(Country)*as.numeric(Date) + share_nuclear + log(demand) + temperature + oil_imputed, 
           data = final_panel_imputed)
 
 
 
 
 #QUANTILE MODELS
-quantile_level <- c(seq(0.1,0.9, by = 0.1))
+quantile_level <- c(seq(0.25, 0.5, 0.75 , by = 0.25))
 
-quantile_model <- rq(log(mean_price) ~ as.factor(Country) + as.factor(Date) + share_nuclear + log(demand) + temp + log(oil_imputed), 
+quantile_model_mean <- rq(log(mean_price) ~ as.factor(Country) + as.factor(Date) + share_nuclear + (demand) + temperature + I(temperature^2) + log(gas_ppi), 
                      data = final_panel_imputed,
                      tau = quantile_level)
 
-quantile_model <- rq(log(sd_price^2) ~ as.factor(Country) + as.factor(Date) + share_nuclear + log(demand) + temp + log(gas_ppi), 
+quantile_model_sd <- rq(log(sd_price^2) ~ as.factor(Country) + as.factor(Date) + share_nuclear + (demand) + temperature + I(temperature^2) + log(gas_ppi), 
                      data = final_panel_imputed,
                      tau = quantile_level)
 
 
-summary(quantile_model, se = "boot")
+summary(quantile_model_sd)
 #for (tau in quantiles) {
 #  model <- rq(log(sd_price^2) ~ as.factor(Country) + as.factor(Date) + share_nuclear + log(demand) + temp + oil_imputed, 
 #              tau = tau, data = final_panel_imputed)
@@ -330,15 +295,105 @@ model_feols_sd <- feols((log(sd_price^2)) ~ nuclear_bin + temperature + I(temper
 
 
 #REGRESSION TABLES
-esttable(model_feols_mean, model_feols_sd)
 
-esttable(model_feols_mean_diff, model_feols_sd_diff)
-
-esttable(model_feols_mean_renew, model_feols_sd_renew)
-
-
+#regression_1
+model_feols_mean <- feols(log(mean_price) ~ share_nuclear + (temperature) + I(temperature^2)  + (demand) + log(gas_ppi) | Country + Date,
+                          vcov = "cluster", 
+                          data = final_panel_imputed)
 
 
+model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temperature + I(temperature^2) + (demand) + log(gas_ppi)  | Country + Date,
+                        vcov = "cluster",
+                        data = final_panel_imputed)
 
+etable(model_feols_mean, model_feols_sd, 
+       tex = TRUE, 
+       dict = c("log(sd_price^2)" = "log(variance)",
+                "log(gas_ppi)" = "log(nat_gas)"))
+
+
+
+#REGRESSION 2 RENEWABLES
+model_feols_mean_renew <- feols(log(mean_price) ~ share_renewables + temperature + I(temperature^2) + (demand) + log(gas_ppi) | Country + Date,
+                                vcov = "cluster", 
+                                data = final_panel)
+
+model_feols_sd_renew <- feols((log(sd_price^2)) ~ share_renewables + temperature + I(temperature^2) + (demand) + log(gas_ppi)  | Country + Date,
+                              vcov = "cluster",
+                              data = final_panel)
+
+model_feols_mean_renew_nuclear <- feols(log(mean_price) ~ share_nuclear + share_renewables + temperature + I(temperature^2) + (demand) + log(gas_ppi) | Country + Date,
+                                vcov = "cluster", 
+                                data = final_panel)
+
+model_feols_sd_renew_nuclear <- feols((log(sd_price^2)) ~ share_nuclear + share_renewables + temperature + I(temperature^2) + (demand) + log(gas_ppi)  | Country + Date,
+                              vcov = "cluster",
+                              data = final_panel)
+
+etable(model_feols_mean_renew, model_feols_sd_renew, model_feols_mean_renew_nuclear, model_feols_sd_renew_nuclear,
+       tex = TRUE, 
+       dict = c("log(sd_price^2)" = "log(variance)",
+                "log(gas_ppi)" = "log(nat_gas)"))
+
+
+#3 REGRESSION FOR DIFFERENTIAL IMPACT DURING ENERGY CRISIS?
+model_feols_mean_diff <- feols((log(mean_price)) ~ share_nuclear +  temperature + I(temperature^2)  + (demand) + log(gas_ppi) + I(energycrisis*share_nuclear) | Country + Date,
+                               vcov = "cluster",
+                               data = final_panel_imputed)
+
+model_feols_sd_diff <- feols((log(sd_price^2)) ~ share_nuclear + temperature + I(temperature^2) + (demand) + log(gas_ppi) + I(energycrisis*share_nuclear) | Country + Date,
+                             vcov = "cluster",
+                             data = final_panel_imputed)
+
+etable(model_feols_mean_diff, model_feols_sd_diff, 
+       tex = TRUE,
+       digits = 2,
+       dict = c("log(sd_price^2)" = "log(variance)",
+                "log(gas_ppi)" = "log(nat_gas)", 
+                "I(energycrisis * share_nuclear)" = "energy_crisis*share_nuclear"))
+
+
+
+#regression_only in countries where there is nuclear
+model_feols_mean_generation <- feols((log(mean_price)) ~ (I(share_nuclear*generation)) + temperature + I(temperature^2)  + demand + log(gas_ppi) | Country + Date,
+                                     vcov = "cluster",
+                                     data = final_panel_imputed %>% filter(share_nuclear>0))
+
+model_feols_sd_generation <- feols(log(sd_price^2) ~ (I(share_nuclear*generation)) + temperature + I(temperature^2) + demand + log(gas_ppi) | Country + Date,
+                                   vcov = "cluster", 
+                                   data = final_panel_imputed %>% filter(share_nuclear>0))
+
+etable(model_feols_mean_generation, model_feols_sd_generation, 
+         tex = TRUE, 
+         dict = c("log(sd_price^2)" = "log(variance)",
+                  "log(gas_ppi)" = "log(nat_gas)", 
+                  "(I(share_nuclear*generation))" = "nuclear_generation"))
+
+
+
+etable(model_feols_mean, model_feols_sd, 
+       tex = TRUE, 
+       dict = c("log(sd_price^2)" = "log(variance)",
+                "log(gas_ppi)" = "log(nat_gas)"))
+
+modelsummary(model_feols_mean)
+
+
+
+#5 REGRESSION FOR DIFFERENTIAL IMPACT ON DEMAND LEVEL?
+model_feols_mean_diff <- feols((log(mean_price)) ~ share_nuclear + I(generation*share_nuclear) + temperature + I(temperature^2) + (demand) + log(gas_ppi) | Country + Date,
+                               vcov = "cluster",
+                               data = final_panel_imputed)
+
+model_feols_sd_diff <- feols((log(sd_price^2)) ~ share_nuclear  + temperature + I(temperature^2) + (demand) + log(gas_ppi) | Country + Date,
+                             vcov = "cluster",
+                             data = final_panel_imputed)
+
+etable(model_feols_mean_diff, model_feols_sd_diff, 
+         tex = TRUE, 
+         digits = 2,
+         dict = c("log(sd_price^2)" = "log(variance)",
+                  "log(gas_ppi)" = "log(nat_gas)", 
+                  "I(generation*share_nuclear)" = "nuclear_generation"))
 
 
