@@ -12,7 +12,7 @@ pacman::p_load(
 )
 
 #ADJUST DIRECTORY
-gen_energy <- read_csv("monthly_full_release_long_format-4.csv")
+gen_energy <- read_csv("data/monthly_full_release_long_format-4.csv")
 
 gen_energy_europe <- gen_energy %>% 
   subset(Continent == "Europe")
@@ -75,7 +75,7 @@ gen_energy_panel[is.na(gen_energy_panel)] <- 0
 # loading in price data ---------------------------------------------------
 
 #ADJUST DIRECTORY
-price_data <- read_csv("price_data.csv")
+price_data <- read_csv("data/price_data.csv")
 
 #calculate mean
 price_data_mean <- price_data %>% 
@@ -96,19 +96,19 @@ price_data_mean_sd <- price_data_mean %>%
 # loading in heating degree days ------------------------------------------
 
 #ADJUST DIRECTORY
-hdd_cdd <- read_csv("hdd_cdd.csv")
+hdd_cdd <- read_csv("data/hdd_cdd.csv")
 
 temp_hdd <- hdd_cdd %>%
   select(geo, TIME_PERIOD, indic_nrg, OBS_VALUE) %>%
   group_by(geo, TIME_PERIOD) %>%
-  summarize(temp = sum(OBS_VALUE)) %>%
+  summarize(hdd = sum(OBS_VALUE)) %>%
   mutate(TIME_PERIOD = ym(TIME_PERIOD)) %>%
   mutate(year = year(TIME_PERIOD)) %>%
   mutate(month = month(TIME_PERIOD))
 
 
 temp_hdd <- temp_hdd %>%
-  select(geo, year, month, temp) %>%
+  select(geo, year, month, hdd) %>%
   rename("Country" = "geo") 
 
 
@@ -117,7 +117,7 @@ temp_hdd <- temp_hdd %>%
 
 
 # Loading in natural gas price data ---------------------------------------
-nat_gas <- read_csv("nat_gas_prices.csv")
+nat_gas <- read_csv("data/nat_gas_prices.csv")
 
 nat_gas_1 <- nat_gas %>%
   rename("Country" = "country_clean") %>%
@@ -129,8 +129,7 @@ nat_gas_1 <- nat_gas %>%
 
 # Loading in oil price data -----------------------------------------------
 
-#ADJUST DIRECTORY
-oil_prices <- read_csv("oil_prices.csv")
+oil_prices <- read_csv("data/oil_prices.csv")
 
 oil <- oil_prices %>%
   select(geo, TIME_PERIOD, indic_nrg, OBS_VALUE) %>%
@@ -142,27 +141,52 @@ oil <- oil_prices %>%
   rename("oil" = "OBS_VALUE")
   
 
+
+# Loading in oil price data -----------------------------------------------
+
+oil_prices <- read_csv("data/oil_prices.csv")
+
+oil <- oil_prices %>%
+  select(geo, TIME_PERIOD, indic_nrg, OBS_VALUE) %>%
+  mutate(TIME_PERIOD = ym(TIME_PERIOD)) %>%
+  mutate(year = year(TIME_PERIOD)) %>%
+  mutate(month = month(TIME_PERIOD)) %>%
+  select(geo, year, month, OBS_VALUE) %>%
+  rename("Country" = "geo") %>%
+  rename("oil" = "OBS_VALUE")
+
+
+
 # merging stuff -----------------------------------------------------------
 final_panel_1 <- left_join(price_data_mean_sd, gen_energy_panel)
+
+# temperature data --------------------------------------------------------
+temp <- read_csv("data/temp_data.csv")
+
+temp <- temp %>%
+  select(!country_code) %>%
+  rename("Country" = "country_name")
 
 final_panel_2 <- left_join(final_panel_1, oil)
 
 final_panel_3 <- left_join(final_panel_2, nat_gas_1)
 
-final_panel <- left_join(final_panel_3, temp_hdd)
+final_panel_4 <- left_join(final_panel_3, temp)
+
+final_panel <- left_join(final_panel_4, temp_hdd)
 
 
 # imputation of oil price data  -------------------------------------------
 final_panel_imputed <- final_panel %>% 
   group_by(Date) %>%
-  mutate(oil_imputed = ifelse(is.na(oil), mean(oil), oil))
+  mutate(oil_imputed = ifelse(is.na(oil), mean(oil, na.rm = TRUE), oil))
 
 
 #PREPARING DATA FOR ENERGY CRISIS regression
-final_panel_imputed <- final_panel_imputed %>% group_by(Date, Country) %>%
+final_panel_imputed <- final_panel_imputed %>% 
+  group_by(Date, Country) %>%
   select(!oil) %>%
-  mutate(energycrisis = ifelse(Date > as.Date("2021-09-01"), 1, 0)) %>%
-  na.omit()
+  mutate(energycrisis = ifelse(Date > as.Date("2021-09-01"), 1, 0))
 
 
 
@@ -179,12 +203,12 @@ final_panel_imputed <- final_panel_imputed %>% group_by(Date, Country) %>%
 #summary(lm((log(sd_price^2)) ~ as.factor(Date) + as.factor(`Country code`) + share_nuclear + demand + temp + oil_imputed, final_panel_imputed))
 
 
-model_feols_mean <- feols(log(mean_price) ~ share_nuclear + (temp) + log(demand) + log(oil_imputed) + log(gas_ppi)| Country + Date,
+model_feols_mean <- feols(log(mean_price) ~ share_nuclear + (temperature) + I(temperature^2) + log(demand) + log(oil_imputed) | Country + Date,
                           vcov = "cluster", 
                           data = final_panel_imputed)
 
 
-model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + log(demand) + log(oil_imputed) + log(gas_ppi)| Country + Date,
+model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temperature + I(temperature^2) + log(demand) + log(oil_imputed) | Country + Date,
                         vcov = "cluster",
                         data = final_panel_imputed)
 
@@ -210,11 +234,11 @@ plm <- lm(log(mean_price) ~  as.factor(Country) + as.numeric(Date) + as.factor(C
 
 
 #DIFFERENTIAL IMPACT DURING ENERGY CRISIS?
-model_feols_mean <- feols((log(mean_price)) ~ share_nuclear + temp + log(demand) + log(oil_imputed) + I(energycrisis*share_nuclear) | Country + Date,
+model_feols_mean <- feols((log(mean_price)) ~ share_nuclear +  temperature + I(temperature^2)  + log(demand) + log(oil_imputed) + I(energycrisis*share_nuclear) | Country + Date,
                           vcov = "cluster",
                           data = final_panel_imputed)
 
-model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + log(demand) + log(oil_imputed) + I(energycrisis*share_nuclear) | Country + Date,
+model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temperature + I(temperature^2) + log(demand) + log(oil_imputed) + I(energycrisis*share_nuclear) | Country + Date,
                         vcov = "cluster",
                         data = final_panel_imputed)
 
