@@ -7,11 +7,12 @@ pacman::p_load(
   plm, 
   sandwich, 
   fixest, 
-  quantreg
+  quantreg, 
+  modelsummary
 )
 
 #ADJUST DIRECTORY
-gen_energy <- read_csv("data/monthly_full_release_long_format-4.csv")
+gen_energy <- read_csv("monthly_full_release_long_format-4.csv")
 
 gen_energy_europe <- gen_energy %>% 
   subset(Continent == "Europe")
@@ -74,7 +75,7 @@ gen_energy_panel[is.na(gen_energy_panel)] <- 0
 # loading in price data ---------------------------------------------------
 
 #ADJUST DIRECTORY
-price_data <- read_csv("data/price_data.csv")
+price_data <- read_csv("price_data.csv")
 
 #calculate mean
 price_data_mean <- price_data %>% 
@@ -95,7 +96,7 @@ price_data_mean_sd <- price_data_mean %>%
 # loading in heating degree days ------------------------------------------
 
 #ADJUST DIRECTORY
-hdd_cdd <- read_csv("data/hdd_cdd.csv")
+hdd_cdd <- read_csv("hdd_cdd.csv")
 
 temp_hdd <- hdd_cdd %>%
   select(geo, TIME_PERIOD, indic_nrg, OBS_VALUE) %>%
@@ -116,7 +117,7 @@ temp_hdd <- temp_hdd %>%
 
 
 # Loading in natural gas price data ---------------------------------------
-nat_gas <- read_csv("data/nat_gas_prices.csv")
+nat_gas <- read_csv("nat_gas_prices.csv")
 
 nat_gas_1 <- nat_gas %>%
   rename("Country" = "country_clean") %>%
@@ -129,7 +130,7 @@ nat_gas_1 <- nat_gas %>%
 # Loading in oil price data -----------------------------------------------
 
 #ADJUST DIRECTORY
-oil_prices <- read_csv("data/oil_prices.csv")
+oil_prices <- read_csv("oil_prices.csv")
 
 oil <- oil_prices %>%
   select(geo, TIME_PERIOD, indic_nrg, OBS_VALUE) %>%
@@ -154,7 +155,7 @@ final_panel <- left_join(final_panel_3, temp_hdd)
 # imputation of oil price data  -------------------------------------------
 final_panel_imputed <- final_panel %>% 
   group_by(Date) %>%
-  mutate(oil_imputed = ifelse(is.na(oil), mean(oil, na.rm = TRUE), oil))
+  mutate(oil_imputed = ifelse(is.na(oil), mean(oil), oil))
 
 
 #PREPARING DATA FOR ENERGY CRISIS regression
@@ -178,12 +179,12 @@ final_panel_imputed <- final_panel_imputed %>% group_by(Date, Country) %>%
 #summary(lm((log(sd_price^2)) ~ as.factor(Date) + as.factor(`Country code`) + share_nuclear + demand + temp + oil_imputed, final_panel_imputed))
 
 
-model_feols_mean <- feols(log(mean_price) ~ (share_nuclear) + log(temp) + (demand) + log(oil_imputed) | Country + Date,
+model_feols_mean <- feols(log(mean_price) ~ share_nuclear + (temp) + log(demand) + log(oil_imputed) + log(gas_ppi)| Country + Date,
                           vcov = "cluster", 
                           data = final_panel_imputed)
 
 
-model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + log(demand) + log(oil_imputed) | Country + Date,
+model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + log(demand) + log(oil_imputed) + log(gas_ppi)| Country + Date,
                         vcov = "cluster",
                         data = final_panel_imputed)
 
@@ -221,24 +222,24 @@ model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + log(demand) +
 
 #DIFFERENTIAL IMPACT WITH ENERGY DEMAND
 
-model_feols_mean <- feols((log(mean_price)) ~ share_nuclear + temp + (demand) + oil_imputed + I((demand)*share_nuclear) | Country + Date,
+model_feols_mean <- feols((log(mean_price)) ~ share_nuclear + temp + (demand) + I((demand)*share_nuclear) | Country + Date,
                           vcov = "cluster",
-                          data = final_panel_imputed)
+                          data = final_panel)
 
 model_feols_mean <- feols(log(mean_price) ~ (share_nuclear) + temp + log(demand) + log(oil_imputed) + I(share_nuclear*log(demand)) | Country + Date,
                           vcov = "cluster", 
-                          data = final_panel_imputed)
+                          data = final_panel)
 
-model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + (demand) + (oil_imputed) + I(demand*share_nuclear) | Country + Date,
+model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + log(demand) + log(oil_imputed) + I(generation*share_nuclear) | Country + Date,
                           vcov = "cluster",
-                          data = final_panel_imputed)
+                          data = final_panel)
 
 
-model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + log(demand) + oil_imputed + I(log(demand)*share_nuclear) | Country + Date,
+model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + (demand) + oil_imputed + I((generation)*share_nuclear) | Country + Date,
                         vcov = "cluster",
                         data = final_panel_imputed)
 
-
+summary(quantile_model, se = "boot")
 
 
 
@@ -250,7 +251,7 @@ quantile_model <- rq(log(mean_price) ~ as.factor(Country) + as.factor(Date) + sh
                      data = final_panel_imputed,
                      tau = quantile_level)
 
-quantile_model <- rq(log(sd_price^2) ~ as.factor(Country) + as.factor(Date) + share_nuclear + log(demand) + temp + log(oil_imputed), 
+quantile_model <- rq(log(sd_price^2) ~ as.factor(Country) + as.factor(Date) + share_nuclear + log(demand) + temp + log(gas_ppi), 
                      data = final_panel_imputed,
                      tau = quantile_level)
 
@@ -270,16 +271,18 @@ summary(quantile_model, se = "boot")
 
 #ADDING RENEWABLES
 
-model_feols_mean <- feols(log(mean_price) ~ (share_nuclear) +  share_renewables + temp + log(demand) + log(oil_imputed) | Country + Date,
+model_feols_mean <- feols(log(mean_price) ~ (share_nuclear)  + temp + log(demand) + log(gas_ppi) | Country + Date,
                           vcov = "cluster", 
-                          data = final_panel_imputed)
+                          data = final_panel)
 
-model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + share_renewables + temp + log(demand) + log(oil_imputed) | Country + Date,
+model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + share_renewables + temp + log(demand) + log(gas_ppi)  | Country + Date,
                         vcov = "cluster",
-                        data = final_panel_imputed)
+                        data = final_panel)
 
 
 
+#REGRESSION TABLES
+esttable(model_feols_mean, model_feols_sd)
 
 
 
