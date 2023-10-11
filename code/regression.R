@@ -11,7 +11,7 @@ pacman::p_load(
 )
 
 #ADJUST DIRECTORY
-gen_energy <- read_csv("monthly_full_release_long_format-4.csv")
+gen_energy <- read_csv("data/monthly_full_release_long_format-4.csv")
 
 gen_energy_europe <- gen_energy %>% 
   subset(Continent == "Europe")
@@ -74,7 +74,7 @@ gen_energy_panel[is.na(gen_energy_panel)] <- 0
 # loading in price data ---------------------------------------------------
 
 #ADJUST DIRECTORY
-price_data <- read_csv("price_data.csv")
+price_data <- read_csv("data/price_data.csv")
 
 #calculate mean
 price_data_mean <- price_data %>% 
@@ -95,7 +95,7 @@ price_data_mean_sd <- price_data_mean %>%
 # loading in heating degree days ------------------------------------------
 
 #ADJUST DIRECTORY
-hdd_cdd <- read_csv("hdd_cdd.csv")
+hdd_cdd <- read_csv("data/hdd_cdd.csv")
 
 temp_hdd <- hdd_cdd %>%
   select(geo, TIME_PERIOD, indic_nrg, OBS_VALUE) %>%
@@ -116,7 +116,7 @@ temp_hdd <- temp_hdd %>%
 
 
 # Loading in natural gas price data ---------------------------------------
-nat_gas <- read_csv("nat_gas_prices.csv")
+nat_gas <- read_csv("data/nat_gas_prices.csv")
 
 nat_gas_1 <- nat_gas %>%
   rename("Country" = "country_clean") %>%
@@ -129,7 +129,7 @@ nat_gas_1 <- nat_gas %>%
 # Loading in oil price data -----------------------------------------------
 
 #ADJUST DIRECTORY
-oil_prices <- read_csv("oil_prices.csv")
+oil_prices <- read_csv("data/oil_prices.csv")
 
 oil <- oil_prices %>%
   select(geo, TIME_PERIOD, indic_nrg, OBS_VALUE) %>%
