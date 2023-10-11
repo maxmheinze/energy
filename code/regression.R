@@ -203,12 +203,12 @@ final_panel_imputed <- final_panel_imputed %>%
 #summary(lm((log(sd_price^2)) ~ as.factor(Date) + as.factor(`Country code`) + share_nuclear + demand + temp + oil_imputed, final_panel_imputed))
 
 
-model_feols_mean <- feols(log(mean_price) ~ share_nuclear + (temperature) + I(temperature^2) + log(demand) + log(oil_imputed) | Country + Date,
+model_feols_mean <- feols(log(mean_price) ~ share_nuclear + (temperature) + I(temperature^2)  + log(demand) + log(gas_ppi) | Country + Date,
                           vcov = "cluster", 
                           data = final_panel_imputed)
 
 
-model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temperature + I(temperature^2) + log(demand) + log(oil_imputed) | Country + Date,
+model_feols_sd <- feols((log(sd_price^2)) ~ share_renewables + temperature + I(temperature^2) + log(demand) + log(gas_ppi)  | Country + Date,
                         vcov = "cluster",
                         data = final_panel_imputed)
 
@@ -234,11 +234,11 @@ plm <- lm(log(mean_price) ~  as.factor(Country) + as.numeric(Date) + as.factor(C
 
 
 #DIFFERENTIAL IMPACT DURING ENERGY CRISIS?
-model_feols_mean <- feols((log(mean_price)) ~ share_nuclear +  temperature + I(temperature^2)  + log(demand) + log(oil_imputed) + I(energycrisis*share_nuclear) | Country + Date,
+model_feols_mean <- feols((log(mean_price)) ~ share_nuclear + I(temperature^2) + temperature  + log(demand) + log(gas_ppi) + I(energycrisis*share_nuclear) | Country + Date,
                           vcov = "cluster",
                           data = final_panel_imputed)
 
-model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temperature + I(temperature^2) + log(demand) + log(oil_imputed) + I(energycrisis*share_nuclear) | Country + Date,
+model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temperature + I(temperature^2) + log(demand) + log(gas_ppi) + I(energycrisis*share_nuclear) | Country + Date,
                         vcov = "cluster",
                         data = final_panel_imputed)
 
@@ -248,15 +248,15 @@ model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temperature + I(temp
 
 model_feols_mean <- feols((log(mean_price)) ~ share_nuclear + temp + (demand) + I((demand)*share_nuclear) | Country + Date,
                           vcov = "cluster",
-                          data = final_panel)
+                          data = final_panel_imputed)
 
 model_feols_mean <- feols(log(mean_price) ~ (share_nuclear) + temp + log(demand) + log(oil_imputed) + I(share_nuclear*log(demand)) | Country + Date,
                           vcov = "cluster", 
-                          data = final_panel)
+                          data = final_panel_imputed)
 
 model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + log(demand) + log(oil_imputed) + I(generation*share_nuclear) | Country + Date,
                           vcov = "cluster",
-                          data = final_panel)
+                          data = final_panel_imputed)
 
 
 model_feols_sd <- feols((log(sd_price^2)) ~ share_nuclear + temp + (demand) + oil_imputed + I((generation)*share_nuclear) | Country + Date,
