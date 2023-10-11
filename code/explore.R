@@ -74,6 +74,26 @@ anim <- plot_data %>%
 animate(anim, width = 2400, height = 1200, start_pause = 10, end_pause = 10, nframes = 300, duration = 20, renderer = gifski_renderer())
 anim_save("output/anim_nuclear/anim_nuclear.gif")
 
+# Static Bar Chart ------------------------------------------------------
+
+plot_data %>%
+  ungroup() %>%
+  mutate(ccode = countrycode(Country, "country.name", "iso2c")) %>%
+  filter(Date == ymd("2022-12-01")) %>%
+  select(ccode, share_nuclear) %>%
+  drop_na() %>%
+  filter(share_nuclear > 0) %>%
+  ggplot() +
+  geom_bar(aes(x = reorder(ccode, -share_nuclear), y = share_nuclear, fill = reorder(ccode, -share_nuclear)), stat = "identity") +
+  theme_bw() +
+  theme(text = element_text(family = "Fira Sans", size = 12)) +
+  labs(title = "Share of Nuclear, End of 2022",
+       x = "",
+       y = "Share of Nuclear Energy (%)") +
+  guides(fill="none")
+
+ggsave("output/nuclear_share.png", plot = last_plot(), width = 2400, height = 1200, units = "px")
+
 
 # Average Price -----------------------------------------------------------
 
