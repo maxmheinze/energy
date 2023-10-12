@@ -20,6 +20,8 @@ pacman::p_load(
 
 source("code/regression.R")
 
+plot_data <- final_panel %>%
+  mutate(Date = ifelse(is.na(Date), ymd(paste0(year, "-", month, "-01")), Date))
 
 # Animations need gganimate 1.0.7 and transformr 0.1.3, newer versions will
 # throw an error (bug) -- so install old versions while removing current versions
@@ -50,7 +52,7 @@ anim <- plot_data %>%
   transition_time(Date) 
 
 animate(anim, width = 2400, height = 1200, start_pause = 10, end_pause = 10, nframes = 300, duration = 20, renderer = gifski_renderer())
-anim_save("output/anim_scatterplot/anim_scatterplot.gif")
+anim_save("output/anim_scatterplot/anim_scatterplot")
 
 
 # Animated Bar Chart ------------------------------------------------------
