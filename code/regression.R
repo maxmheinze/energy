@@ -337,15 +337,23 @@ etable(model_feols_mean_renew, model_feols_sd_renew, model_feols_mean_renew_nucl
 
 
 #3 REGRESSION FOR DIFFERENTIAL IMPACT DURING ENERGY CRISIS?
-model_feols_mean_diff <- feols((log(mean_price)) ~ share_nuclear +  temperature + I(temperature^2)  + (demand) + log(gas_ppi) + I(energycrisis*share_nuclear) | Country + Date,
+model_feols_mean_diff_1 <- feols((log(mean_price)) ~ share_nuclear +  temperature + I(temperature^2)  + (demand) + log(gas_ppi) + energycrisis + I(energycrisis*share_nuclear) | Country,
                                vcov = "cluster",
                                data = final_panel_imputed)
 
-model_feols_sd_diff <- feols((log(sd_price^2)) ~ share_nuclear + temperature + I(temperature^2) + (demand) + log(gas_ppi) + I(energycrisis*share_nuclear) | Country + Date,
+model_feols_sd_diff_1 <- feols((log(sd_price^2)) ~ share_nuclear + temperature + I(temperature^2) + (demand) + log(gas_ppi) + energycrisis + I(energycrisis*share_nuclear) | Country,
                              vcov = "cluster",
                              data = final_panel_imputed)
 
-etable(model_feols_mean_diff, model_feols_sd_diff, 
+model_feols_mean_diff_2 <- feols((log(mean_price)) ~ share_nuclear +  I(energycrisis*share_nuclear) + temperature + I(temperature^2)  + (demand) + log(gas_ppi) + energycrisis  | Country + Date,
+                               vcov = "cluster",
+                               data = final_panel_imputed)
+
+model_feols_sd_diff_2 <- feols((log(sd_price^2)) ~ share_nuclear + I(energycrisis*share_nuclear) + temperature + I(temperature^2) + (demand) + log(gas_ppi) + energycrisis | Country + Date,
+                             vcov = "cluster",
+                             data = final_panel_imputed)
+
+etable(model_feols_mean_diff_1, model_feols_sd_diff_1, model_feols_mean_diff_2, model_feols_sd_diff_2,
        tex = TRUE,
        digits = 2,
        dict = c("log(sd_price^2)" = "log(variance)",
