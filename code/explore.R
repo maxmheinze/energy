@@ -52,7 +52,7 @@ anim <- plot_data %>%
   transition_time(Date) 
 
 animate(anim, width = 2400, height = 1200, start_pause = 10, end_pause = 10, nframes = 300, duration = 20, renderer = gifski_renderer())
-anim_save("output/anim_scatterplot/anim_scatterplot")
+anim_save("output/anim_scatterplot/anim_scatterplot.gif")
 
 
 # Animated Bar Chart ------------------------------------------------------
